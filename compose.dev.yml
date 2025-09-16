@@ -1,0 +1,12 @@
+services:
+  app:
+    container_name: nodup-dev
+    build:
+      target: development
+    environment:
+      - NODE_ENV=development
+    ports:
+      - 3000:3000
+    volumes:
+      - .:/app
+      - /app/node_modules
