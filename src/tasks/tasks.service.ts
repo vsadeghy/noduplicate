@@ -1,46 +1,76 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { tryCatch } from '~/utils/trycatch';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { Task } from './entities/task.entity';
+import { PrismaService, type Task } from './prisma.service';
 
+@Injectable()
 export class TasksService {
-  private tasks: Task[] = [];
-  private id = 0;
-  create(createTaskDto: CreateTaskDto) {
-    const taskExists = this.tasks.find(
-      (task) => task.title === createTaskDto.title,
+  constructor(private prisma: PrismaService) {}
+  async create(createTaskDto: CreateTaskDto): Promise<Task> {
+    const [taskExists, error] = await tryCatch(
+      this.prisma.task.findUnique({
+        where: { title: createTaskDto.title },
+      }),
     );
+
+    if (error) {
+      console.error(error);
+      throw new Error('Unexpected error');
+    }
     if (taskExists) {
-      return new ConflictException(
+      throw new ConflictException(
         `Task with title ${createTaskDto.title} already exists`,
       );
     }
-    const newTask = { ...createTaskDto, id: this.id++ };
-    this.tasks.push(newTask);
-    return newTask;
+    return this.prisma.task.create({ data: createTaskDto });
   }
 
-  findAll() {
-    return this.tasks;
+  async findAll(): Promise<Task[]> {
+    return this.prisma.task.findMany();
   }
 
-  findOne(id: number) {
-    const task = this.tasks.find((task) => task.id === id);
+  async findOne(id: number): Promise<Task> {
+    const [task, error] = await tryCatch(
+      this.prisma.task.findUnique({
+        where: { id },
+      }),
+    );
+    if (error) {
+      console.error(error);
+      throw new Error('Unexpected error');
+    }
     if (!task) {
       throw new NotFoundException(`Task with id ${id} not found`);
     }
     return task;
   }
 
-  update(id: number, updateTaskDto: UpdateTaskDto) {
-    let task = this.findOne(id);
-    task = { ...task, ...updateTaskDto };
-    return task;
+  async update(id: number, updateTaskDto: UpdateTaskDto): Promise<Task> {
+    let task = await this.findOne(id);
+    const [updatedTask, error] = await tryCatch(
+      this.prisma.task.update({ where: task, data: updateTaskDto }),
+    );
+    if (error) {
+      console.error(error);
+      throw new Error('Unexpected error');
+    }
+    return updatedTask;
   }
 
-  remove(id: number) {
-    const task = this.findOne(id);
-    this.tasks = this.tasks.filter((task) => task.id !== id);
-    return task;
+  async remove(id: number): Promise<Task> {
+    const task = await this.findOne(id);
+    const [removedTask, error] = await tryCatch(
+      this.prisma.task.delete({ where: task }),
+    );
+    if (error) {
+      console.error(error);
+      throw new Error('Unexpected error');
+    }
+    return removedTask;
   }
 }

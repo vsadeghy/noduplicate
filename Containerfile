@@ -7,6 +7,8 @@ COPY . .
 
 FROM base AS development
 COPY . .
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
 CMD ["pnpm", "run", "start:dev"]
 
 FROM base AS build
@@ -19,4 +21,4 @@ RUN corepack enable && corepack prepare pnpm@10.16.1 --activate
 COPY --from=build /app/dist ./dist
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --prod
-CMD ["node", "dist/main.js"]
+CMD ["pnpm", "run", "start:prod"]
