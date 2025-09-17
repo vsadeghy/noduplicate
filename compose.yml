@@ -1,4 +1,10 @@
 services:
+  redis:
+    image: redis:8.2-alpine
+    container_name: redis
+    ports:
+      - 6379:6379
+
   postgres:
     image: postgres:17.6
     container_name: postgres
@@ -18,7 +24,9 @@ services:
         DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     environment:
       - NODE_ENV=production
+      - REDIS_HOST=redis
     ports:
       - 3000:3000
     depends_on:
       - postgres
+      - redis

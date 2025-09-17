@@ -1,8 +1,11 @@
+import { RedisService } from '@liaoliaots/nestjs-redis';
 import {
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import Redis from 'ioredis';
+import { allTasksCacheKey } from '~/constants';
 import { tryCatch } from '~/utils/trycatch';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -10,7 +13,13 @@ import { PrismaService, type Task } from './prisma.service';
 
 @Injectable()
 export class TasksService {
-  constructor(private prisma: PrismaService) {}
+  private redis: Redis;
+  constructor(
+    private prisma: PrismaService,
+    redisService: RedisService,
+  ) {
+    this.redis = redisService.getOrThrow();
+  }
   async create(createTaskDto: CreateTaskDto): Promise<Task> {
     const [taskExists, error] = await tryCatch(
       this.prisma.task.findUnique({
@@ -27,7 +36,9 @@ export class TasksService {
         `Task with title ${createTaskDto.title} already exists`,
       );
     }
-    return this.prisma.task.create({ data: createTaskDto });
+    const newTask = this.prisma.task.create({ data: createTaskDto });
+    this.redis.del(allTasksCacheKey);
+    return newTask;
   }
 
   async findAll(): Promise<Task[]> {
@@ -51,7 +62,7 @@ export class TasksService {
   }
 
   async update(id: number, updateTaskDto: UpdateTaskDto): Promise<Task> {
-    let task = await this.findOne(id);
+    const task = await this.findOne(id);
     const [updatedTask, error] = await tryCatch(
       this.prisma.task.update({ where: task, data: updateTaskDto }),
     );
@@ -59,6 +70,7 @@ export class TasksService {
       console.error(error);
       throw new Error('Unexpected error');
     }
+    this.redis.del(allTasksCacheKey);
     return updatedTask;
   }
 
